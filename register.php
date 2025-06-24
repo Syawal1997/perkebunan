@@ -1,5 +1,11 @@
 <?php
-include 'database/config.php';
+session_start();
+require_once 'database/config.php';
+
+if (isset($_SESSION['user'])) {
+    header("Location: dashboard/" . $_SESSION['role'] . ".php");
+    exit();
+}
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $nama = $_POST['nama'];
@@ -7,27 +13,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = password_hash($_POST['password'], PASSWORD_DEFAULT);
     $role = $_POST['role'];
     $alamat = $_POST['alamat'];
-    $no_hp = $_POST['no_hp'];
+    $telepon = $_POST['telepon'];
     
     // Cek apakah email sudah terdaftar
-    $check = "SELECT email FROM users WHERE email = ?";
-    $stmt = $conn->prepare($check);
-    $stmt->bind_param("s", $email);
-    $stmt->execute();
-    $stmt->store_result();
+    $stmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
+    $stmt->execute([$email]);
     
-    if ($stmt->num_rows > 0) {
-        $error = "Email sudah terdaftar";
+    if ($stmt->rowCount() > 0) {
+        $error = "Email sudah terdaftar!";
     } else {
-        $query = "INSERT INTO users (nama, email, password, role, alamat, no_hp) VALUES (?, ?, ?, ?, ?, ?)";
-        $stmt = $conn->prepare($query);
-        $stmt->bind_param("ssssss", $nama, $email, $password, $role, $alamat, $no_hp);
+        // Insert user baru
+        $stmt = $pdo->prepare("INSERT INTO users (nama, email, password, role, alamat, telepon) VALUES (?, ?, ?, ?, ?, ?)");
+        $stmt->execute([$nama, $email, $password, $role, $alamat, $telepon]);
         
-        if ($stmt->execute()) {
-            $success = "Pendaftaran berhasil. Silakan login.";
-        } else {
-            $error = "Terjadi kesalahan. Silakan coba lagi.";
-        }
+        $_SESSION['register_success'] = true;
+        header("Location: login.php");
+        exit();
     }
 }
 ?>
@@ -39,21 +40,85 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Daftar - Hasil Perkebunan</title>
     <link rel="stylesheet" href="style.css">
+    <style>
+        .register-container {
+            max-width: 500px;
+            margin: 5rem auto;
+            padding: 2rem;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+        
+        .register-container h2 {
+            text-align: center;
+            margin-bottom: 1.5rem;
+            color: #4CAF50;
+        }
+        
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+        
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        
+        .btn-register {
+            width: 100%;
+            padding: 12px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        
+        .login-link {
+            text-align: center;
+            margin-top: 1.5rem;
+        }
+        
+        .error {
+            color: red;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+    </style>
 </head>
 <body>
-    <?php include 'includes/header.php'; ?>
-    
-    <div class="form-container">
-        <h2>Daftar Akun</h2>
+    <header>
+        <div class="container">
+            <h1>Hasil Perkebunan Online</h1>
+            <nav>
+                <ul>
+                    <li><a href="index.html">Beranda</a></li>
+                    <li><a href="index.html#produk">Produk</a></li>
+                    <li><a href="index.html#tentang">Tentang Kami</a></li>
+                    <li><a href="index.html#kontak">Kontak</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <div class="register-container">
+        <h2>Daftar Akun Baru</h2>
+        
         <?php if (isset($error)): ?>
-            <div class="alert" style="color: red; margin-bottom: 15px;"><?php echo $error; ?></div>
+            <div class="error"><?php echo $error; ?></div>
         <?php endif; ?>
         
-        <?php if (isset($success)): ?>
-            <div class="alert" style="color: green; margin-bottom: 15px;"><?php echo $success; ?></div>
-        <?php endif; ?>
-        
-        <form action="register.php" method="POST">
+        <form method="POST" action="">
             <div class="form-group">
                 <label for="nama">Nama Lengkap</label>
                 <input type="text" id="nama" name="nama" required>
@@ -70,9 +135,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </div>
             
             <div class="form-group">
-                <label for="role">Daftar Sebagai</label>
+                <label for="role">Daftar sebagai</label>
                 <select id="role" name="role" required>
-                    <option value="">Pilih Role</option>
+                    <option value="">Pilih peran</option>
                     <option value="pembeli">Pembeli</option>
                     <option value="penjual">Penjual</option>
                 </select>
@@ -80,20 +145,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             <div class="form-group">
                 <label for="alamat">Alamat</label>
-                <textarea id="alamat" name="alamat" required></textarea>
+                <input type="text" id="alamat" name="alamat" required>
             </div>
             
             <div class="form-group">
-                <label for="no_hp">Nomor HP</label>
-                <input type="text" id="no_hp" name="no_hp" required>
+                <label for="telepon">Nomor Telepon</label>
+                <input type="text" id="telepon" name="telepon" required>
             </div>
             
-            <button type="submit" class="btn">Daftar</button>
+            <button type="submit" class="btn-register">Daftar</button>
         </form>
         
-        <p style="margin-top: 15px;">Sudah punya akun? <a href="login.php">Login disini</a></p>
+        <div class="login-link">
+            Sudah punya akun? <a href="login.php">Login disini</a>
+        </div>
     </div>
-    
-    <?php include 'includes/footer.php'; ?>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 Hasil Perkebunan Online. All rights reserved.</p>
+        </div>
+    </footer>
 </body>
 </html>
